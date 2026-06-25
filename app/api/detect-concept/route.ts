@@ -31,7 +31,7 @@ Only return JSON, nothing else.`
 
     const completion = await model.doGenerate({
       prompt: [
-        { role: 'system', content: [{ type: 'text', text: 'You are an extractor that outputs only JSON.' }] },
+        { role: 'system', content: 'You are an extractor that outputs only JSON.' },
         { role: 'user', content: [{ type: 'text', text: prompt }] }
       ],
       maxOutputTokens: 300

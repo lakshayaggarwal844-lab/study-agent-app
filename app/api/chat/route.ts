@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '../../../lib/supabase'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import type { LanguageModelV3Message } from '@ai-sdk/provider'
 
 type ConceptRow = {
   id?: number
@@ -56,8 +57,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const messages = [
-      { role: 'system', content: [{ type: 'text', text: systemPrompt }] },
+    const messages: LanguageModelV3Message[] = [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: [{ type: 'text', text: `Subject: ${subject || 'N/A'}\nConcept: ${concept || 'N/A'}\nUser: ${userMessage}` }] }
     ]
 

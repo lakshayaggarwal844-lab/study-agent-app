@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabase
       .from('concepts')
-      .upsert(payload, { onConflict: ['subject', 'concept'] })
+      .upsert(payload, { onConflict: 'subject,concept' })
       .select()
       .single()
 
