@@ -14,8 +14,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing or invalid `userMessage`' }, { status: 400 })
     }
 
-    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const model = anthropic.chat('claude-haiku-4-5-20251001')
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Missing ANTHROPIC_API_KEY' }, { status: 500 })
+    }
+
+    const anthropic = createAnthropic({ apiKey })
+    const model = anthropic.chat('claude-sonnet-4-5')
 
     const prompt = `Extract the study topic from the user's message. Return only valid JSON with exactly two fields: subject and concept. If the message is not about studying a concept, return subject: "" and concept: "".
 
@@ -38,14 +43,14 @@ Only return JSON, nothing else.`
     })
 
     const resultText = completion.content
-      .filter((contentPart) => (contentPart as any).type === 'text')
-      .map((contentPart) => (contentPart as any).text)
+      .filter((contentPart): contentPart is { type: 'text'; text: string } => contentPart.type === 'text')
+      .map((contentPart) => contentPart.text)
       .join('')
 
-    let parsed
+    let parsed: { subject?: string; concept?: string }
     try {
       parsed = JSON.parse(resultText)
-    } catch (error) {
+    } catch {
       parsed = { subject: '', concept: '' }
     }
 

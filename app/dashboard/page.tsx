@@ -24,7 +24,7 @@ const computeScore = (level?: string) => scoreMap[level ?? ''] ?? 0
 
 export default async function DashboardPage() {
   const supabase = createSupabaseClient()
-  const { data, error } = await supabase.from('concepts').select('*')
+  const { data } = await supabase.from('concepts').select('*')
 
   const concepts = Array.isArray(data) ? (data as ConceptRow[]) : []
 

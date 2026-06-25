@@ -62,8 +62,13 @@ export async function POST(req: Request) {
       { role: 'user', content: [{ type: 'text', text: `Subject: ${subject || 'N/A'}\nConcept: ${concept || 'N/A'}\nUser: ${userMessage}` }] }
     ]
 
-    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const model = anthropic.chat('claude-sonnet-4-20250514')
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Missing ANTHROPIC_API_KEY' }, { status: 500 })
+    }
+
+    const anthropic = createAnthropic({ apiKey })
+    const model = anthropic.chat('claude-sonnet-4-5')
 
     const completion = await model.doStream({
       prompt: messages,
