@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     const safeNextSteps = normalizeStringArray(nextSteps)
 
     const supabase = createSupabaseClient()
-    const payload = {
+    const payload: any = {
       subject,
       concept,
       mastery_level: typeof masteryLevel === 'string' ? masteryLevel : null,
@@ -59,9 +59,9 @@ export async function POST(req: Request) {
       last_updated: new Date().toISOString()
     }
 
-    const { data, error } = await supabase
-      .from('concepts')
-      .upsert(payload as any, { onConflict: ['subject', 'concept'] })
+    const conceptsClient: any = supabase.from('concepts')
+    const { data, error } = await conceptsClient
+      .upsert(payload, { onConflict: ['subject', 'concept'] })
       .select()
       .single()
 
