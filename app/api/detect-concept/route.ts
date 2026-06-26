@@ -47,16 +47,29 @@ Only return JSON, nothing else.`
       .map((contentPart) => contentPart.text)
       .join('')
 
-    let parsed: { subject?: string; concept?: string }
+    const extractValue = (key: string, text: string) => {
+      const jsonRegex = new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i')
+      const jsonMatch = jsonRegex.exec(text)
+      if (jsonMatch?.[1]) return jsonMatch[1].trim()
+
+      const lineRegex = new RegExp(`${key}\\s*[:=]\\s*['\"]?([^'\"\n]+)['\"]?`, 'i')
+      const lineMatch = lineRegex.exec(text)
+      return lineMatch?.[1]?.trim() ?? ''
+    }
+
+    let parsed: { subject: string; concept: string } = { subject: '', concept: '' }
     try {
-      parsed = JSON.parse(resultText)
+      const json = JSON.parse(resultText)
+      parsed.subject = typeof json.subject === 'string' ? json.subject.trim() : ''
+      parsed.concept = typeof json.concept === 'string' ? json.concept.trim() : ''
     } catch {
-      parsed = { subject: '', concept: '' }
+      parsed.subject = extractValue('subject', resultText)
+      parsed.concept = extractValue('concept', resultText)
     }
 
     const responsePayload = {
-      subject: typeof parsed.subject === 'string' ? parsed.subject : '',
-      concept: typeof parsed.concept === 'string' ? parsed.concept : ''
+      subject: parsed.subject,
+      concept: parsed.concept
     }
 
     return NextResponse.json(responsePayload)

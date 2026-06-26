@@ -2,7 +2,7 @@ import { createServerClient as createSupabaseClient } from '../../lib/supabase-s
 import DashboardClient from './DashboardClient'
 
 type ConceptRow = {
-  id?: number
+  id?: string
   subject?: string
   concept?: string
   mastery_level?: string

@@ -77,6 +77,8 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState('')
   const [lastDetected, setLastDetected] = useState<DetectResult>({ subject: '', concept: '' })
   const [lastAssistantId, setLastAssistantId] = useState<string | null>(null)
+  const [lastAssistantMessage, setLastAssistantMessage] = useState<ChatMessage | null>(null)
+  const [assistantReadyToSave, setAssistantReadyToSave] = useState(false)
   const listRef = useRef<HTMLDivElement | null>(null)
   const messagesRef = useRef<ChatMessage[]>(messages)
   const router = useRouter()
@@ -86,8 +88,13 @@ export default function Home() {
   }, [messages])
 
   const canSave = useMemo(() => {
-    return lastDetected.subject !== '' && lastDetected.concept !== '' && lastAssistantId !== null
-  }, [lastDetected, lastAssistantId])
+    return (
+      lastDetected.subject.trim() !== '' &&
+      lastDetected.concept.trim() !== '' &&
+      lastAssistantMessage !== null &&
+      assistantReadyToSave
+    )
+  }, [lastDetected, lastAssistantMessage, assistantReadyToSave])
 
   const scrollToBottom = () => {
     if (listRef.current) {
@@ -109,6 +116,7 @@ export default function Home() {
     ])
     setInput('')
     setIsSending(true)
+    setAssistantReadyToSave(false)
 
     try {
       const detectRes = await fetch('/api/detect-concept', {
@@ -127,15 +135,12 @@ export default function Home() {
       setLastDetected({ subject, concept })
 
       const assistantId = `assistant-${Date.now()}`
+      const placeholder = subject || concept ? `Thinking about ${subject || 'a subject'} / ${concept || 'a concept'}...` : 'Thinking...'
+      const assistantMessage: ChatMessage = { id: assistantId, role: 'assistant', content: placeholder }
+
       setLastAssistantId(assistantId)
-      setMessages((current) => [
-        ...current,
-        {
-          id: assistantId,
-          role: 'assistant',
-          content: subject || concept ? `Thinking about ${subject || 'a subject'} / ${concept || 'a concept'}...` : 'Thinking...'
-        }
-      ])
+      setLastAssistantMessage(assistantMessage)
+      setMessages((current) => [...current, assistantMessage])
 
       scrollToBottom()
 
@@ -159,20 +164,34 @@ export default function Home() {
         done = streamDone
         if (value) {
           assistantText += decoder.decode(value, { stream: true })
+          const updatedAssistantMessage: ChatMessage = {
+            id: assistantId,
+            role: 'assistant',
+            content: assistantText
+          }
+
           setMessages((current) =>
             current.map((message) =>
-              message.id === assistantId ? { ...message, content: assistantText } : message
+              message.id === assistantId ? updatedAssistantMessage : message
             )
           )
+          setLastAssistantMessage(updatedAssistantMessage)
           scrollToBottom()
         }
       }
 
+      const finalAssistantMessage: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: assistantText
+      }
       setMessages((current) =>
         current.map((message) =>
-          message.id === assistantId ? { ...message, content: assistantText } : message
+          message.id === assistantId ? finalAssistantMessage : message
         )
       )
+      setLastAssistantMessage(finalAssistantMessage)
+      setAssistantReadyToSave(true)
 
       setLastDetected({ subject, concept })
     } catch (error) {
@@ -187,7 +206,7 @@ export default function Home() {
     if (!canSave) return
 
     // determine which assistant message to save: prefer lastAssistantId, otherwise fallback
-    const assistantIdToUse = lastAssistantId ?? messagesRef.current.slice().reverse().find((m) => m.role === 'assistant')?.id
+    const assistantIdToUse = lastAssistantMessage?.id ?? lastAssistantId ?? messagesRef.current.slice().reverse().find((m) => m.role === 'assistant')?.id
     if (!assistantIdToUse) return
 
     setMessages((current) =>
@@ -196,7 +215,10 @@ export default function Home() {
       )
     )
 
-    const assistantMessage = messagesRef.current.find((message) => message.id === assistantIdToUse)
+    const assistantMessage =
+      lastAssistantMessage?.id === assistantIdToUse
+        ? lastAssistantMessage
+        : messagesRef.current.find((message) => message.id === assistantIdToUse)
     if (!assistantMessage) return
 
     const payload = getSavePayload(assistantMessage.content, lastDetected.subject, lastDetected.concept)
@@ -290,20 +312,26 @@ export default function Home() {
               <div className="mb-4 rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{errorMessage}</div>
             ) : null}
 
-            {canSave ? (
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-300">
+            {(lastDetected.subject.trim() !== '' || lastDetected.concept.trim() !== '') ? (
+              <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   Detected concept: <span className="font-semibold text-slate-100">{lastDetected.subject}</span> /{' '}
                   <span className="font-semibold text-slate-100">{lastDetected.concept}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSaveProgress}
-                  disabled={isSending}
-                  className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Save progress
-                </button>
+                {canSave ? (
+                  <button
+                    type="button"
+                    onClick={handleSaveProgress}
+                    disabled={isSending}
+                    className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Save progress
+                  </button>
+                ) : (
+                  <div className="rounded-full bg-slate-800 px-4 py-2 text-xs uppercase tracking-[0.3em] text-slate-400">
+                    Waiting for the assistant response to finish before saving.
+                  </div>
+                )}
               </div>
             ) : null}
 

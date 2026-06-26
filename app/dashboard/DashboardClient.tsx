@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 type ConceptRow = {
-  id?: number
+  id?: string
   subject?: string
   concept?: string
   mastery_level?: string
@@ -63,10 +63,9 @@ const formatDate = (value?: string | null) => {
 const computeScore = (level?: string) => scoreMap[level ?? ''] ?? 0
 
 export default function DashboardClient({ concepts, totalConcepts, uniqueSubjects, averageMasteryPercent }: DashboardClientProps) {
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
-  const toggleExpanded = (id?: number) => {
-    if (id === undefined) return
+  const toggleExpanded = (id: string) => {
     setExpanded((current) => ({ ...current, [id]: !current[id] }))
   }
 
@@ -98,7 +97,7 @@ export default function DashboardClient({ concepts, totalConcepts, uniqueSubject
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
           {concepts.map((concept) => {
-            const id = concept.id ?? 0
+            const id = concept.id ?? 'unknown'
             const subject = concept.subject ?? 'Unknown'
             const score = computeScore(concept.mastery_level)
             const progressWidth = `${Math.round((score / 4) * 100)}%`
