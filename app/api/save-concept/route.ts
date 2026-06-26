@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '../../../lib/supabase'
+import { createServerClient as createSupabaseClient } from '../../../lib/supabase-server'
 
 type SaveConceptBody = {
   subject?: string
@@ -28,27 +28,40 @@ export async function POST(req: Request) {
       notes
     } = body || {}
 
-    if (!subject || !concept) {
-      return NextResponse.json({ error: 'Missing required `subject` or `concept`' }, { status: 400 })
+    if (!subject || typeof subject !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid `subject`' }, { status: 400 })
     }
+
+    if (!concept || typeof concept !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid `concept`' }, { status: 400 })
+    }
+
+    const normalizeStringArray = (value: unknown): string[] => {
+      return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+    }
+
+    const safeDeepDiveGist = normalizeStringArray(deepDiveGist)
+    const safeStrongAreas = normalizeStringArray(strongAreas)
+    const safeWeakAreas = normalizeStringArray(weakAreas)
+    const safeNextSteps = normalizeStringArray(nextSteps)
 
     const supabase = createSupabaseClient()
     const payload = {
       subject,
       concept,
-      mastery_level: masteryLevel ?? null,
-      overview_gist: overviewGist ?? null,
-      deep_dive_gist: deepDiveGist ?? null,
-      strong_areas: strongAreas ?? null,
-      weak_areas: weakAreas ?? null,
-      next_steps: nextSteps ?? null,
-      notes: notes ?? null,
+      mastery_level: typeof masteryLevel === 'string' ? masteryLevel : null,
+      overview_gist: typeof overviewGist === 'string' ? overviewGist : null,
+      deep_dive_gist: safeDeepDiveGist,
+      strong_areas: safeStrongAreas,
+      weak_areas: safeWeakAreas,
+      next_steps: safeNextSteps,
+      notes: typeof notes === 'string' ? notes : null,
       last_updated: new Date().toISOString()
     }
 
     const { data, error } = await supabase
       .from('concepts')
-      .upsert(payload, { onConflict: 'subject,concept' })
+      .upsert(payload, { onConflict: ['subject', 'concept'] })
       .select()
       .single()
 

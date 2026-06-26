@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from '../../lib/supabase'
+import { createServerClient as createSupabaseClient } from '../../lib/supabase-server'
 import DashboardClient from './DashboardClient'
 
 type ConceptRow = {

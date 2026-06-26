@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '../../../lib/supabase'
+import { createServerClient as createSupabaseClient } from '../../../lib/supabase-server'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import type { LanguageModelV3Message } from '@ai-sdk/provider'
 
@@ -75,7 +75,17 @@ export async function POST(req: Request) {
       maxOutputTokens: 1000
     })
 
-    return new NextResponse(completion.stream, {
+    const textStream = completion.stream.pipeThrough(
+      new TransformStream({
+        transform(chunk: any, controller) {
+          if (chunk?.type === 'text-delta' || chunk?.type === 'reasoning-delta') {
+            controller.enqueue(chunk.delta)
+          }
+        }
+      })
+    )
+
+    return new NextResponse(textStream.pipeThrough(new TextEncoderStream()), {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache'

@@ -1,6 +1,7 @@
 'use client'
 
-import { FormEvent, useMemo, useRef, useState } from 'react'
+import { FormEvent, useMemo, useRef, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 type MessageRole = 'user' | 'assistant'
 
@@ -77,6 +78,12 @@ export default function Home() {
   const [lastDetected, setLastDetected] = useState<DetectResult>({ subject: '', concept: '' })
   const [lastAssistantId, setLastAssistantId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const messagesRef = useRef<ChatMessage[]>(messages)
+  const router = useRouter()
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const canSave = useMemo(() => {
     return lastDetected.subject !== '' && lastDetected.concept !== '' && lastAssistantId !== null
@@ -177,18 +184,24 @@ export default function Home() {
   }
 
   const handleSaveProgress = async () => {
-    if (!canSave || !lastAssistantId) return
+    if (!canSave) return
+
+    // determine which assistant message to save: prefer lastAssistantId, otherwise fallback
+    const assistantIdToUse = lastAssistantId ?? messagesRef.current.slice().reverse().find((m) => m.role === 'assistant')?.id
+    if (!assistantIdToUse) return
 
     setMessages((current) =>
       current.map((message) =>
-        message.id === lastAssistantId ? { ...message, saveState: 'saving' } : message
+        message.id === assistantIdToUse ? { ...message, saveState: 'saving' } : message
       )
     )
 
-    const assistantMessage = messages.find((message) => message.id === lastAssistantId)
+    const assistantMessage = messagesRef.current.find((message) => message.id === assistantIdToUse)
     if (!assistantMessage) return
 
     const payload = getSavePayload(assistantMessage.content, lastDetected.subject, lastDetected.concept)
+    console.debug('handleSaveProgress: canSave, lastDetected, lastAssistantId', canSave, lastDetected, lastAssistantId)
+    console.debug('handleSaveProgress: payload', payload)
 
     try {
       const saveRes = await fetch('/api/save-concept', {
@@ -197,20 +210,34 @@ export default function Home() {
         body: JSON.stringify(payload)
       })
 
+      const respText = await saveRes.text()
+      let respJson: any = null
+      try {
+        respJson = JSON.parse(respText)
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+      console.debug('handleSaveProgress: response', { status: saveRes.status, text: respText, json: respJson })
+
       if (!saveRes.ok) {
-        throw new Error('Save failed')
+        throw new Error(`Save failed: ${saveRes.status}`)
       }
 
       setMessages((current) =>
         current.map((message) =>
-          message.id === lastAssistantId ? { ...message, saveState: 'saved' } : message
+          message.id === assistantIdToUse ? { ...message, saveState: 'saved' } : message
         )
       )
+      try {
+        router.refresh()
+      } catch (e) {
+        // ignore if router not available
+      }
     } catch (error) {
-      console.error(error)
+      console.error('handleSaveProgress error', error)
       setMessages((current) =>
         current.map((message) =>
-          message.id === lastAssistantId ? { ...message, saveState: 'error' } : message
+          message.id === assistantIdToUse ? { ...message, saveState: 'error' } : message
         )
       )
     }
